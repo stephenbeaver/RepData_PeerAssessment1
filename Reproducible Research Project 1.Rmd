@@ -1,0 +1,178 @@
+---
+title: "Reproducible Research Project 1"
+author: "Stephen Beaver"
+date: "5/2/2019"
+output: html_document
+---
+
+
+## Load Packages
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(lubridate)
+```
+
+
+
+## Load Data
+
+```{r}
+data <- read.csv('activity.csv')
+data$date <- as.Date(data$date)
+```
+
+
+## Steps taken per day?
+
+Histogram Plot
+
+```{r}
+by_day <- data %>% group_by(date)
+table_by_day <- by_day %>% summarise(steps = sum(steps))
+plot <- ggplot(table_by_day, aes(x= steps)) + geom_histogram(bins = 20)
+plot <- plot + ggtitle("Histogram: Total Number of Steps Per Day")
+plot <- plot + xlab("Steps Per Day") + ylab("Day Count")
+plot
+```
+
+Mean
+
+```{r}
+summarise(table_by_day, mean(steps, na.rm = TRUE))
+
+```
+
+Meidan
+
+```{r}
+summarise(table_by_day, median(steps, na.rm = TRUE))
+```
+
+## Activity Pattern
+
+Plot
+
+```{r}
+by_interval <- data %>% group_by(interval)
+by_interval <- by_interval[!is.na(by_interval$steps),]
+table_by_interval <- by_interval %>% summarise(steps = mean(steps))
+plot2 <- ggplot(table_by_interval, aes(x=interval, y=steps))
+plot2 <- plot2 +geom_line() + xlab("Interval Index")+ylab("Mean Steps") +ggtitle("Mean Steps by Interval")
+plot2
+
+```
+
+Max Average Interval Index
+
+```{r}
+filter(table_by_interval, table_by_interval$steps == max(table_by_interval$steps))
+```
+
+## Imput Missing Values
+
+Number of Missing Data Points
+
+```{r}
+sum(is.na(data$steps))
+```
+
+Fill in Missing Data with the Average of that Interval
+
+```{r}
+ImputeData <- data
+for (i in 1:nrow(ImputeData))
+    {
+        if(is.na(data[i, 'steps']) == TRUE)
+            {
+                interval_index <- ImputeData$interval[i]
+                #used dplyer::pull otherwise a 1x1 tibble was returned, couldn't summaire
+                value <- dplyr::pull(table_by_interval[table_by_interval$interval == interval_index, 'steps'])
+                ImputeData$steps[i] <- value
+            }
+    }
+
+impute_by_day <- ImputeData %>% group_by(date)
+
+table_impute_by_day <- impute_by_day %>% summarise(steps = sum(steps))
+
+```
+
+Check Data
+
+Result: NA value is filled in and the others are unaffected.
+
+```{r}
+summary(table_by_day)
+
+head(table_impute_by_day)
+```
+
+
+
+
+
+Histogram Plot
+
+```{r}
+
+plot3 <- ggplot(table_impute_by_day, aes(x= steps)) + geom_histogram(bins = 20)
+plot3 <- plot3 + ggtitle("Histogram: Total Number of Steps Per Day (Imputed)")
+plot3 <- plot3 + xlab("Steps Per Day") + ylab("Day Count")
+plot3
+```
+
+Mean
+
+```{r}
+summarise(table_impute_by_day, mean(steps))
+
+```
+
+Meidan
+
+```{r}
+summarise(table_impute_by_day, median(steps))
+
+```
+
+Because I used the average for each interval to fill in the individual missing values for that interval there was no change in the mean from the original data and subsequently, the median is now the average as well.
+
+
+## Weekends vs Weekdays
+
+Create Weekend Variable
+
+```{r}
+NewImputeData <- mutate(ImputeData, weekday = weekdays(ImputeData$date))
+NewImputeData <- mutate(NewImputeData, Weekend = ifelse(NewImputeData$weekday %in% c("Saturday", "Sunday"), 'Weekend', 'Weekday'))
+NewImputeData$Weekend <- as.factor(NewImputeData$Weekend)
+
+```
+
+Plot
+
+```{r}
+NewImputeData_by_weekend <- NewImputeData %>% group_by(Weekend, interval)
+
+last_table <- NewImputeData_by_weekend %>% summarise(steps = mean(steps))
+plot4 <- ggplot(last_table, aes(x=interval, y=steps, color=Weekend))
+plot4 <- plot4 +geom_line() + xlab("Interval Index")+ylab("Mean Steps") +ggtitle("Mean Steps by Interval and Weekend") 
+
+#+ facet_wrap(~Weekend)
+plot4
+```
+
+Plot
+```{r}
+NewImputeData_by_weekday <- NewImputeData %>% group_by(weekday, interval)
+
+last_table2 <- NewImputeData_by_weekday %>% summarise(steps = mean(steps))
+plot5 <- ggplot(last_table2, aes(x=interval, y=steps, color=weekday))
+plot5 <- plot5 +geom_line() + xlab("Interval Index")+ylab("Mean Steps") +ggtitle("Mean Steps by Interval and Weekday")+facet_wrap(~weekday)
+plot5
+
+```
+
+
